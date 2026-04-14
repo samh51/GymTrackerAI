@@ -1,7 +1,7 @@
 import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import google.genai as genai
+import google.generativeai as genai
 import pandas as pd
 import json
 from datetime import datetime
