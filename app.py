@@ -32,21 +32,27 @@ with tab_train:
 
     with col2:
         if 'active_workout' in st.session_state and st.session_state.active_workout:
-            st.subheader("Today's Protocol")
+            plan = st.session_state.active_workout
+            split_name = plan.get('recommended_split', 'Unknown Split')
+            
+            # Display the AI's strategic decision
+            st.subheader(f"Today's Protocol: {split_name}")
+            st.caption(f"🧠 **AI Rationale:** {plan.get('rationale', 'No rationale provided.')}")
+            st.divider()
             
             with st.form("execution_form"):
                 results_to_log = []
                 
-                for idx, t in enumerate(st.session_state.active_workout):
+                # Loop through the exercises array inside the JSON object
+                for idx, t in enumerate(plan.get('exercises', [])):
                     is_new = t.get('is_new_suggestion', False)
                     
-                    # Highlight AI suggestions
                     if is_new:
                         st.warning(f"💡 **AI Suggestion:** {t['exercise']} (Not in your Library)")
                         accept_new = st.checkbox("Accept & Save to Library", value=True, key=f"acc_{idx}")
                     else:
                         st.markdown(f"#### {t['exercise']}")
-                        accept_new = False # Doesn't matter, already in library
+                        accept_new = False 
                         
                     st.info(f"**Target:** {t.get('target_reps', '8-10')} @ **{t.get('target_weight_kg', 0)} kg**")
                     
@@ -69,20 +75,18 @@ with tab_train:
                 if st.form_submit_button("Log Workout & Process Updates"):
                     date_str = datetime.now().strftime("%Y-%m-%d")
                     with st.spinner("Processing workout..."):
-                        # 1. Filter out rejected suggestions
                         final_results = []
                         for r in results_to_log:
                             if r['is_new'] and not r['accept_new']:
-                                continue # User unchecked the box, skip this exercise entirely
+                                continue 
                             final_results.append(r)
                             
-                        # 2. Add accepted suggestions to the master library
                         for r in final_results:
                             if r['is_new'] and r['accept_new']:
                                 logic.add_exercise(r['exercise'], r['muscle'], workout_env, r['a_weight'], r['t_reps'])
                                 
-                        # 3. Log the history and let AI calculate next targets
-                        logic.log_and_update(date_str, workout_env, final_results)
+                        # PASS THE SPLIT NAME to the logger
+                        logic.log_and_update(date_str, workout_env, split_name, final_results)
                         
                     st.success("Workout Secured. Library Updated.")
                     del st.session_state.active_workout
