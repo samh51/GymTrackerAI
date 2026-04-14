@@ -31,7 +31,7 @@ def update_library_targets(updates):
 
 # --- AI WORKOUT GENERATION ---
 def suggest_workout(environment, energy_level, duration):
-    """AI analyzes history, time, and selects exercises from the library."""
+    """AI analyzes history, time, and suggests exercises, inventing new ones if the library is sparse."""
     history = pd.DataFrame(db_log.get_all_records())
     library = get_library()
     
@@ -42,7 +42,7 @@ def suggest_workout(environment, energy_level, duration):
     recent_history = history.tail(30).to_string() if not history.empty else "No previous history."
 
     prompt = f"""
-    You are an elite sports scientist. Create an optimal hypertrophy workout for today.
+    You are an elite sports scientist creating an optimal hypertrophy workout.
     Environment: {environment}
     Energy Level: {energy_level}
     Time Available: {duration}
@@ -54,18 +54,23 @@ def suggest_workout(environment, energy_level, duration):
     {available_ex}
     
     Task:
-    1. Analyze the history to determine which muscle groups are most recovered.
-    2. Select exercises from the Available Library that fit the timeframe. 
-       - CRITICAL TIME RULES:
-       - If 10 min: Select ONLY 1 or 2 exercises max. High intensity.
-       - If 30-45 min: Select 3-4 exercises.
-       - If 1h+: Select 4-6 exercises.
-    3. Output the selection as a strict JSON array.
+    1. Determine which muscle groups are most recovered.
+    2. Select exercises from the Available Library to fill the {duration} timeframe (10m: 1-2, 30m: 3-4, 1h+: 4-6 exercises).
+    3. IF the Available Library does NOT have enough exercises for this environment to meet the timeframe, you MUST invent and suggest NEW, highly effective exercises that fit the '{environment}'.
+    4. Output as a strict JSON array.
     
-    Format:
+    Format EXACTLY like this:
     [
-      {{"exercise": "Exact Name from Library", "target_weight_kg": CurrentWeightKG_from_library, "target_reps": "CurrentReps_from_library"}}
+      {{
+        "exercise": "Exercise Name", 
+        "target_weight_kg": 20, 
+        "target_reps": "3x8-10", 
+        "is_new_suggestion": false,
+        "primary_muscle": "Chest"
+      }}
     ]
+    
+    CRITICAL RULE: Set "is_new_suggestion" to true ONLY if you invented the exercise and it was NOT in the Available Library. If true, provide an accurate "primary_muscle" (Chest, Back, Legs, Shoulders, Arms, Core).
     """
     
     response = ai_model.generate_content(prompt)
@@ -73,7 +78,7 @@ def suggest_workout(environment, energy_level, duration):
         return json.loads(response.text.replace('```json', '').replace('```', '').strip())
     except Exception:
         return []
-
+        
 # --- AI PROGRESSION EVALUATION ---
 def calculate_next_targets(completed_workout):
     """AI analyzes performance and calculates targets for the NEXT time."""
