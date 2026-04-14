@@ -17,7 +17,7 @@ client = gspread.authorize(creds)
 # Connect to the Sheet
 SHEET_NAME = "GymTrackerAI"
 try:
-    db_sheet = https://docs.google.com/spreadsheets/d/1HjD_5l2OV1HdQIY-VzD1qK6bqnzHBN36yz40fpStn2Q/edit?gid=883371807#gid=883371807
+    db_sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1HjD_5l2OV1HdQIY-VzD1qK6bqnzHBN36yz40fpStn2Q/edit?gid=883371807#gid=883371807").sheet1
 except gspread.exceptions.SpreadsheetNotFound:
     st.error(f"Critical Error: Database '{SHEET_NAME}' not found or not shared with Service Account.")
     st.stop()
