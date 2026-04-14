@@ -6,7 +6,7 @@ import google.generativeai as genai
 # --- AI CONFIGURATION ---
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 # Using the fast, rate-limit friendly model
-ai_model = genai.GenerativeModel('gemini-1.5-flash')
+ai_model = genai.GenerativeModel('gemini-2.5-flash')
 
 # --- DATABASE CONFIGURATION ---
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
