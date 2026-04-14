@@ -1,5 +1,6 @@
 import pandas as pd
 import json
+import streamlit as st
 from config import db_log, db_library, ai_model
 
 # --- EXERCISE LIBRARY MANAGEMENT ---
@@ -11,7 +12,6 @@ def add_exercise(name, muscle, environment, start_weight, start_reps):
     db_library.append_row([name, muscle, environment, start_weight, start_reps])
 
 def delete_exercise(name):
-    # gspread is clunky with deletions. We pull, filter, clear, and rewrite.
     df = get_library()
     df = df[df['ExerciseName'] != name]
     db_library.clear()
@@ -24,14 +24,14 @@ def update_library_targets(updates):
     if df.empty:
         return
 
-    # 1. Enforce strict data types to prevent Pandas crashes
+    # Enforce strict data types to prevent Pandas crashes
     df['CurrentWeightKG'] = pd.to_numeric(df['CurrentWeightKG'], errors='coerce').fillna(0.0).astype(float)
     df['CurrentReps'] = df['CurrentReps'].astype(str)
     
     for update in updates:
         idx = df.index[df['ExerciseName'] == update['exercise']].tolist()
         if idx:
-            # 2. Sanitize AI output. If it hallucinates text instead of a number, fallback to the old weight.
+            # Sanitize AI output
             try:
                 safe_weight = float(update['new_weight'])
             except (ValueError, TypeError, KeyError):
@@ -42,7 +42,6 @@ def update_library_targets(updates):
             df.loc[idx[0], 'CurrentWeightKG'] = safe_weight
             df.loc[idx[0], 'CurrentReps'] = safe_reps
     
-    # 3. Write back to database
     db_library.clear()
     db_library.update([df.columns.values.tolist()] + df.values.tolist())
 
@@ -79,8 +78,8 @@ def suggest_workout(environment, energy_level, duration):
     Output strictly as a JSON object. NO markdown formatting.
     Format EXACTLY like this:
     {{
-      "recommended_split": "Name of the Split (e.g., Pull Day)",
-      "rationale": "One short sentence explaining why this split was chosen based on the history.",
+      "recommended_split": "Name of the Split",
+      "rationale": "One short sentence explaining why.",
       "exercises": [
         {{
           "exercise": "Exercise Name", 
@@ -95,24 +94,10 @@ def suggest_workout(environment, energy_level, duration):
     
     response = ai_model.generate_content(prompt)
     try:
-        # Parse the JSON object
         return json.loads(response.text.replace('```json', '').replace('```', '').strip())
     except Exception:
         return None
 
-def log_and_update(date, env, split_name, results_to_log):
-    """Logs the workout with the explicitly defined split name."""
-    # 1. Log to history
-    for res in results_to_log:
-        db_log.append_row([date, env, split_name, res['exercise'], res['t_weight'], res['t_reps'], res['a_weight'], res['a_reps'], res['feedback']])
-    
-    # 2. Let AI calculate next week's targets based on today's feedback
-    new_targets = calculate_next_targets(results_to_log)
-    
-    # 3. Update the master library
-    if new_targets:
-        update_library_targets(new_targets)
-        
 # --- AI PROGRESSION EVALUATION ---
 def calculate_next_targets(completed_workout):
     """AI analyzes performance and calculates targets for the NEXT time."""
@@ -139,10 +124,11 @@ def calculate_next_targets(completed_workout):
     except Exception:
         return []
 
-def log_and_update(date, env, results_to_log):
+def log_and_update(date, env, split_name, results_to_log):
+    """Logs the workout with the explicitly defined split name."""
     # 1. Log to history
     for res in results_to_log:
-        db_log.append_row([date, env, "Auto-Split", res['exercise'], res['t_weight'], res['t_reps'], res['a_weight'], res['a_reps'], res['feedback']])
+        db_log.append_row([date, env, split_name, res['exercise'], res['t_weight'], res['t_reps'], res['a_weight'], res['a_reps'], res['feedback']])
     
     # 2. Let AI calculate next week's targets based on today's feedback
     new_targets = calculate_next_targets(results_to_log)
