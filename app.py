@@ -22,7 +22,7 @@ SHEET_NAME = "WorkoutData"
 try:
     sheet = client.open("GymTrackerAI").sheet1
 except gspread.exceptions.SpreadsheetNotFound:
-    st.error(f"Please create a Google Sheet named '{GymTrackerAI}'.")
+    st.error(f"Please create a Google Sheet named '{"GymTrackerAI"}'.")
     st.stop()
 
 # --- STATE MANAGEMENT FOR TEMPLATES ---
