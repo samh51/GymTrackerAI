@@ -20,12 +20,29 @@ def delete_exercise(name):
 def update_library_targets(updates):
     """Updates the master library with new targets calculated by AI after a workout."""
     df = get_library()
+    
+    if df.empty:
+        return
+
+    # 1. Enforce strict data types to prevent Pandas crashes
+    df['CurrentWeightKG'] = pd.to_numeric(df['CurrentWeightKG'], errors='coerce').fillna(0.0).astype(float)
+    df['CurrentReps'] = df['CurrentReps'].astype(str)
+    
     for update in updates:
         idx = df.index[df['ExerciseName'] == update['exercise']].tolist()
         if idx:
-            df.loc[idx[0], 'CurrentWeightKG'] = update['new_weight']
-            df.loc[idx[0], 'CurrentReps'] = update['new_reps']
+            # 2. Sanitize AI output. If it hallucinates text instead of a number, fallback to the old weight.
+            try:
+                safe_weight = float(update['new_weight'])
+            except (ValueError, TypeError, KeyError):
+                safe_weight = df.loc[idx[0], 'CurrentWeightKG'] 
+                
+            safe_reps = str(update.get('new_reps', df.loc[idx[0], 'CurrentReps']))
+            
+            df.loc[idx[0], 'CurrentWeightKG'] = safe_weight
+            df.loc[idx[0], 'CurrentReps'] = safe_reps
     
+    # 3. Write back to database
     db_library.clear()
     db_library.update([df.columns.values.tolist()] + df.values.tolist())
 
