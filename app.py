@@ -18,9 +18,13 @@ with tab_train:
         workout_env = st.selectbox("Environment", ["Gym", "Home", "Outdoor"])
         energy_level = st.select_slider("Energy", options=["Low", "Mid", "High"], value="Mid")
         
+        # New Duration Constraint
+        duration = st.selectbox("Available Time", ["10 min", "30 min", "45 min", "1 h", "1.5 h", "2 h"], index=3)
+        
         if st.button("Generate Optimal Workout"):
-            with st.spinner("Analyzing fatigue & selecting exercises..."):
-                plan = logic.suggest_workout(workout_env, energy_level)
+            with st.spinner(f"Building a {duration} protocol..."):
+                # Pass duration to the logic function
+                plan = logic.suggest_workout(workout_env, energy_level, duration)
                 if plan:
                     st.session_state.active_workout = plan
                 else:
