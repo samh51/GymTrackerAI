@@ -1,61 +1,107 @@
 import pandas as pd
 import json
-import streamlit as st
-from config import db_sheet, ai_model
+from config import db_log, db_library, ai_model
 
-def get_last_performance(exercise_name):
-    """Fetches only the most recent data for a specific exercise."""
-    data = db_sheet.get_all_records()
-    df = pd.DataFrame(data)
-    if df.empty or 'exercise' not in df.columns:
-        return None
-    
-    ex_df = df[df['exercise'] == exercise_name]
-    if ex_df.empty:
-        return None
-    
-    return ex_df.iloc[-1].to_dict()
+# --- EXERCISE LIBRARY MANAGEMENT ---
+def get_library():
+    data = db_library.get_all_records()
+    return pd.DataFrame(data)
 
-def calculate_progression_batch(exercises_history, current_energy):
-    """Sends all exercises in one single API call to avoid rate limits."""
-    history_context = ""
-    for item in exercises_history:
-        ex = item['exercise']
-        past = item['history']
-        if not past:
-            history_context += f"- {ex}: First time performing. Needs baseline.\n"
-        else:
-            history_context += f"- {ex}: Last weight: {past.get('a_weight')}kg, Reps: {past.get('a_reps')}, Feedback: '{past.get('feedback')}'\n"
+def add_exercise(name, muscle, environment, start_weight, start_reps):
+    db_library.append_row([name, muscle, environment, start_weight, start_reps])
+
+def delete_exercise(name):
+    # gspread is clunky with deletions. We pull, filter, clear, and rewrite.
+    df = get_library()
+    df = df[df['ExerciseName'] != name]
+    db_library.clear()
+    db_library.update([df.columns.values.tolist()] + df.values.tolist())
+
+def update_library_targets(updates):
+    """Updates the master library with new targets calculated by AI after a workout."""
+    df = get_library()
+    for update in updates:
+        idx = df.index[df['ExerciseName'] == update['exercise']].tolist()
+        if idx:
+            df.loc[idx[0], 'CurrentWeightKG'] = update['new_weight']
+            df.loc[idx[0], 'CurrentReps'] = update['new_reps']
+    
+    db_library.clear()
+    db_library.update([df.columns.values.tolist()] + df.values.tolist())
+
+# --- AI WORKOUT GENERATION ---
+def suggest_workout(environment, energy_level):
+    """AI analyzes history and selects exercises from the library."""
+    history = pd.DataFrame(db_log.get_all_records())
+    library = get_library()
+    
+    # Filter library by environment (e.g., if Outdoor, don't show Barbell exercises)
+    available_ex = library[library['Environment'].isin([environment, 'Any'])].to_dict('records')
+    
+    recent_history = history.tail(30).to_string() if not history.empty else "No previous history."
 
     prompt = f"""
-    You are an elite sports scientist calculating progressive overload.
-    User's Current Energy Level Today: {current_energy}
+    You are an elite sports scientist. Create an optimal hypertrophy workout for today.
+    Environment: {environment}
+    Energy Level: {energy_level}
     
-    Here is the history for today's routine:
-    {history_context}
+    Recent Workout History:
+    {recent_history}
     
-    Rules for progression:
-    - If feedback was "A lot of energy left", aggressively increase weight (2.5 - 5kg).
-    - If feedback was "Medium energy left", slightly increase weight (1 - 2.5kg) OR increase reps.
-    - If feedback was "No energy left" or "Not Achieved", maintain or slightly decrease weight.
+    Available Exercises in Library (You MUST only choose from this list):
+    {available_ex}
     
-    Output strictly as a JSON array of objects with NO markdown.
-    Format EXACTLY like this:
+    Task:
+    1. Analyze the history to determine which muscle groups are most recovered and due for training.
+    2. Select 4-6 exercises from the Available Library that target those muscles.
+    3. Output the selection as a strict JSON array.
+    
+    Format:
     [
-      {{"exercise": "Exercise Name 1", "target_weight_kg": 82.5, "target_sets": 3, "target_reps": "8-10", "rationale": "Brief reason"}},
-      {{"exercise": "Exercise Name 2", "target_weight_kg": 40, "target_sets": 3, "target_reps": "10-12", "rationale": "Brief reason"}}
+      {{"exercise": "Exact Name from Library", "target_weight_kg": CurrentWeightKG_from_library, "target_reps": "CurrentReps_from_library"}}
     ]
     """
     
     response = ai_model.generate_content(prompt)
-    response_text = response.text.replace('```json', '').replace('```', '').strip()
-    
     try:
-        return json.loads(response_text)
-    except json.JSONDecodeError:
+        return json.loads(response.text.replace('```json', '').replace('```', '').strip())
+    except Exception:
         return []
 
-def log_exercise_to_db(date, w_type, exercise, t_weight, t_reps, a_weight, a_reps, feedback):
-    """Writes a single row to Google Sheets."""
-    row = [date, w_type, exercise, t_weight, t_reps, a_weight, a_reps, feedback]
-    db_sheet.append_row(row)
+# --- AI PROGRESSION EVALUATION ---
+def calculate_next_targets(completed_workout):
+    """AI analyzes performance and calculates targets for the NEXT time."""
+    prompt = f"""
+    Evaluate this completed workout and calculate progressive overload for the NEXT session.
+    
+    Workout Data:
+    {completed_workout}
+    
+    Rules for next session's targets:
+    - Feedback "A lot of energy left": Aggressive weight increase (+2.5 to 5kg).
+    - Feedback "Medium energy left": Slight weight increase (+1 to 2.5kg) or rep increase.
+    - Feedback "No energy left" / "Failure": Maintain weight.
+    - Feedback "Not Achieved": Decrease weight slightly.
+    
+    Output strictly as JSON array:
+    [
+      {{"exercise": "Name", "new_weight": 82.5, "new_reps": "8-10"}}
+    ]
+    """
+    response = ai_model.generate_content(prompt)
+    try:
+        return json.loads(response.text.replace('```json', '').replace('```', '').strip())
+    except Exception:
+        return []
+
+def log_and_update(date, env, results_to_log):
+    # 1. Log to history
+    for res in results_to_log:
+        db_log.append_row([date, env, "Auto-Split", res['exercise'], res['t_weight'], res['t_reps'], res['a_weight'], res['a_reps'], res['feedback']])
+    
+    # 2. Let AI calculate next week's targets based on today's feedback
+    new_targets = calculate_next_targets(results_to_log)
+    
+    # 3. Update the master library
+    if new_targets:
+        update_library_targets(new_targets)
