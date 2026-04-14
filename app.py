@@ -38,7 +38,16 @@ with tab_train:
                 results_to_log = []
                 
                 for idx, t in enumerate(st.session_state.active_workout):
-                    st.markdown(f"#### {t['exercise']}")
+                    is_new = t.get('is_new_suggestion', False)
+                    
+                    # Highlight AI suggestions
+                    if is_new:
+                        st.warning(f"💡 **AI Suggestion:** {t['exercise']} (Not in your Library)")
+                        accept_new = st.checkbox("Accept & Save to Library", value=True, key=f"acc_{idx}")
+                    else:
+                        st.markdown(f"#### {t['exercise']}")
+                        accept_new = False # Doesn't matter, already in library
+                        
                     st.info(f"**Target:** {t.get('target_reps', '8-10')} @ **{t.get('target_weight_kg', 0)} kg**")
                     
                     c1, c2, c3 = st.columns(3)
@@ -52,14 +61,29 @@ with tab_train:
                     
                     results_to_log.append({
                         "exercise": t['exercise'], "t_weight": t.get('target_weight_kg', 0), "t_reps": t.get('target_reps', ''),
-                        "a_weight": a_weight, "a_reps": a_reps, "feedback": feedback
+                        "a_weight": a_weight, "a_reps": a_reps, "feedback": feedback,
+                        "is_new": is_new, "accept_new": accept_new, "muscle": t.get('primary_muscle', 'Unknown')
                     })
                     st.divider()
                     
-                if st.form_submit_button("Log & Calculate Next Targets"):
+                if st.form_submit_button("Log Workout & Process Updates"):
                     date_str = datetime.now().strftime("%Y-%m-%d")
-                    with st.spinner("Logging data and calculating next week's progression..."):
-                        logic.log_and_update(date_str, workout_env, results_to_log)
+                    with st.spinner("Processing workout..."):
+                        # 1. Filter out rejected suggestions
+                        final_results = []
+                        for r in results_to_log:
+                            if r['is_new'] and not r['accept_new']:
+                                continue # User unchecked the box, skip this exercise entirely
+                            final_results.append(r)
+                            
+                        # 2. Add accepted suggestions to the master library
+                        for r in final_results:
+                            if r['is_new'] and r['accept_new']:
+                                logic.add_exercise(r['exercise'], r['muscle'], workout_env, r['a_weight'], r['t_reps'])
+                                
+                        # 3. Log the history and let AI calculate next targets
+                        logic.log_and_update(date_str, workout_env, final_results)
+                        
                     st.success("Workout Secured. Library Updated.")
                     del st.session_state.active_workout
 
