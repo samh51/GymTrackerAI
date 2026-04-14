@@ -74,13 +74,21 @@ with tab_manage:
         st.write("**Add New Exercise**")
         n_name = st.text_input("Name (e.g., Bench Press)")
         n_muscle = st.selectbox("Primary Muscle", ["Chest", "Back", "Legs", "Shoulders", "Arms", "Core"])
-        n_env = st.selectbox("Requires Environment", ["Gym", "Home", "Outdoor", "Any"])
+        
+        # Replaced selectbox with multiselect
+        n_envs = st.multiselect("Environments (Select all that apply)", ["Gym", "Home", "Outdoor"])
+        
         n_weight = st.number_input("Starting Weight (kg)", min_value=0.0, step=2.5)
         n_reps = st.text_input("Target Reps (e.g., 3x8-10)")
         
         if st.button("Add to Library"):
-            logic.add_exercise(n_name, n_muscle, n_env, n_weight, n_reps)
-            st.success("Added! Refresh page to see.")
+            if not n_envs:
+                st.error("You must select at least one environment.")
+            else:
+                # Convert the list ["Gym", "Home"] into a string "Gym, Home"
+                env_string = ", ".join(n_envs)
+                logic.add_exercise(n_name, n_muscle, env_string, n_weight, n_reps)
+                st.success("Added! Refresh page to see.")
             
     with c2:
         st.write("**Delete Exercise**")
