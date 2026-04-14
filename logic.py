@@ -30,13 +30,14 @@ def update_library_targets(updates):
     db_library.update([df.columns.values.tolist()] + df.values.tolist())
 
 # --- AI WORKOUT GENERATION ---
-def suggest_workout(environment, energy_level):
-    """AI analyzes history and selects exercises from the library."""
+def suggest_workout(environment, energy_level, duration):
+    """AI analyzes history, time, and selects exercises from the library."""
     history = pd.DataFrame(db_log.get_all_records())
     library = get_library()
     
-    # Filter library by environment (e.g., if Outdoor, don't show Barbell exercises)
-    available_ex = library[library['Environment'].isin([environment, 'Any'])].to_dict('records')
+    library['Environment'] = library['Environment'].fillna("")
+    mask = library['Environment'].str.contains(environment, case=False) | library['Environment'].str.contains("Any", case=False)
+    available_ex = library[mask].to_dict('records')
     
     recent_history = history.tail(30).to_string() if not history.empty else "No previous history."
 
@@ -44,16 +45,21 @@ def suggest_workout(environment, energy_level):
     You are an elite sports scientist. Create an optimal hypertrophy workout for today.
     Environment: {environment}
     Energy Level: {energy_level}
+    Time Available: {duration}
     
     Recent Workout History:
     {recent_history}
     
-    Available Exercises in Library (You MUST only choose from this list):
+    Available Exercises in Library:
     {available_ex}
     
     Task:
-    1. Analyze the history to determine which muscle groups are most recovered and due for training.
-    2. Select 4-6 exercises from the Available Library that target those muscles.
+    1. Analyze the history to determine which muscle groups are most recovered.
+    2. Select exercises from the Available Library that fit the timeframe. 
+       - CRITICAL TIME RULES:
+       - If 10 min: Select ONLY 1 or 2 exercises max. High intensity.
+       - If 30-45 min: Select 3-4 exercises.
+       - If 1h+: Select 4-6 exercises.
     3. Output the selection as a strict JSON array.
     
     Format:
