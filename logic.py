@@ -48,7 +48,7 @@ def update_library_targets(updates):
 
 # --- AI WORKOUT GENERATION ---
 def suggest_workout(environment, energy_level, duration):
-    """AI analyzes history, time, and suggests exercises, inventing new ones if the library is sparse."""
+    """AI analyzes history, determines the split, and suggests exercises."""
     history = pd.DataFrame(db_log.get_all_records())
     library = get_library()
     
@@ -71,30 +71,47 @@ def suggest_workout(environment, energy_level, duration):
     {available_ex}
     
     Task:
-    1. Determine which muscle groups are most recovered.
-    2. Select exercises from the Available Library to fill the {duration} timeframe (10m: 1-2, 30m: 3-4, 1h+: 4-6 exercises).
-    3. IF the Available Library does NOT have enough exercises for this environment to meet the timeframe, you MUST invent and suggest NEW, highly effective exercises that fit the '{environment}'.
-    4. Output as a strict JSON array.
+    1. Analyze the history to determine which muscle groups are most recovered. 
+    2. Based on that recovery, DECLARE a specific workout split for today (e.g., "Push", "Pull", "Legs", "Upper Body", "Lower Body", "Full Body").
+    3. Select exercises to fit the {duration} timeframe (10m: 1-2, 30m: 3-4, 1h+: 4-6).
+    4. If the library lacks exercises for the chosen split/environment, invent new ones.
     
+    Output strictly as a JSON object. NO markdown formatting.
     Format EXACTLY like this:
-    [
-      {{
-        "exercise": "Exercise Name", 
-        "target_weight_kg": 20, 
-        "target_reps": "3x8-10", 
-        "is_new_suggestion": false,
-        "primary_muscle": "Chest"
-      }}
-    ]
-    
-    CRITICAL RULE: Set "is_new_suggestion" to true ONLY if you invented the exercise and it was NOT in the Available Library. If true, provide an accurate "primary_muscle" (Chest, Back, Legs, Shoulders, Arms, Core).
+    {{
+      "recommended_split": "Name of the Split (e.g., Pull Day)",
+      "rationale": "One short sentence explaining why this split was chosen based on the history.",
+      "exercises": [
+        {{
+          "exercise": "Exercise Name", 
+          "target_weight_kg": 20, 
+          "target_reps": "3x8-10", 
+          "is_new_suggestion": false,
+          "primary_muscle": "Back"
+        }}
+      ]
+    }}
     """
     
     response = ai_model.generate_content(prompt)
     try:
+        # Parse the JSON object
         return json.loads(response.text.replace('```json', '').replace('```', '').strip())
     except Exception:
-        return []
+        return None
+
+def log_and_update(date, env, split_name, results_to_log):
+    """Logs the workout with the explicitly defined split name."""
+    # 1. Log to history
+    for res in results_to_log:
+        db_log.append_row([date, env, split_name, res['exercise'], res['t_weight'], res['t_reps'], res['a_weight'], res['a_reps'], res['feedback']])
+    
+    # 2. Let AI calculate next week's targets based on today's feedback
+    new_targets = calculate_next_targets(results_to_log)
+    
+    # 3. Update the master library
+    if new_targets:
+        update_library_targets(new_targets)
         
 # --- AI PROGRESSION EVALUATION ---
 def calculate_next_targets(completed_workout):
