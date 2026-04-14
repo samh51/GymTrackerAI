@@ -20,7 +20,7 @@ client = gspread.authorize(creds)
 # We now need the main data sheet. (You should also create a 'Templates' sheet later to save these permanently)
 SHEET_NAME = "WorkoutData"
 try:
-    sheet = client.open("GymTrackerAI").sheet1
+    sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1HjD_5l2OV1HdQIY-VzD1qK6bqnzHBN36yz40fpStn2Q/edit?usp=sharing").sheet1
 except gspread.exceptions.SpreadsheetNotFound:
     st.error(f"Please create a Google Sheet named '{"GymTrackerAI"}'.")
     st.stop()
