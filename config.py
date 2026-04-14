@@ -14,15 +14,16 @@ creds_dict = dict(st.secrets["gcp_service_account"])
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 
-# Connect to the Sheet
-SHEET_NAME = "GymTrackerAI"
+# Connect directly to the Sheet via Hardcoded ID
+SHEET_ID = "1HjD_5l2OV1HdQIY-VzD1qK6bqnzHBN36yz40fpStn2Q"
 try:
-    db_sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1HjD_5l2OV1HdQIY-VzD1qK6bqnzHBN36yz40fpStn2Q/edit?gid=883371807#gid=883371807").sheet1
+    # Bypassing name search, opening by direct ID
+    spreadsheet = client.open_by_key(SHEET_ID)
     db_log = spreadsheet.worksheet("WorkoutLog")
     db_library = spreadsheet.worksheet("ExerciseLibrary")
 except gspread.exceptions.SpreadsheetNotFound:
-    st.error(f"Critical Error: Database '{SHEET_NAME}' not found or not shared with Service Account.")
+    st.error("Critical Error: The hardcoded spreadsheet ID was not found. Check if the link is correct and accessible by the service account.")
     st.stop()
 except gspread.exceptions.WorksheetNotFound:
-    st.error("Critical Error: Make sure you have tabs named 'WorkoutLog' and 'ExerciseLibrary'.")
+    st.error("Critical Error: The spreadsheet was found, but the tabs are wrong. Make sure you have exactly two tabs named 'WorkoutLog' and 'ExerciseLibrary'.")
     st.stop()
