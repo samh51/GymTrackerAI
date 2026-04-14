@@ -18,6 +18,11 @@ client = gspread.authorize(creds)
 SHEET_NAME = "GymTrackerAI"
 try:
     db_sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1HjD_5l2OV1HdQIY-VzD1qK6bqnzHBN36yz40fpStn2Q/edit?gid=883371807#gid=883371807").sheet1
+    db_log = spreadsheet.worksheet("WorkoutLog")
+    db_library = spreadsheet.worksheet("ExerciseLibrary")
 except gspread.exceptions.SpreadsheetNotFound:
     st.error(f"Critical Error: Database '{SHEET_NAME}' not found or not shared with Service Account.")
+    st.stop()
+except gspread.exceptions.WorksheetNotFound:
+    st.error("Critical Error: Make sure you have tabs named 'WorkoutLog' and 'ExerciseLibrary'.")
     st.stop()
