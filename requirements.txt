@@ -3,3 +3,4 @@ gspread
 google-generativeai
 pandas
 oauth2client
+gTTS
