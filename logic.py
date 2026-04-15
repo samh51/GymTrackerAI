@@ -159,9 +159,15 @@ def suggest_workout(environment, energy_level, duration):
       ]
     }}
     """
-    response = ai_model.generate_content(prompt)
-    try: return json.loads(response.text.replace('```json', '').replace('```', '').strip())
-    except: return None
+    try:
+        response = ai_model.generate_content(prompt)
+        return json.loads(response.text.replace('```json', '').replace('```', '').strip())
+    except ResourceExhausted:
+        st.error("Whoops! We are moving too fast for the AI! 🚀 The API just needs a 60-second breather. Grab some water and click Generate again in a minute!")
+        return None
+    except Exception as e:
+        st.error(f"Oh no, a little hiccup occurred: {e} - Let's try that again!")
+        return None
 
 def calculate_next_targets(completed_workout):
     prompt = f"""Evaluate this and calculate progressive overload for NEXT time: {completed_workout}
