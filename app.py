@@ -33,34 +33,14 @@ with tab_train:
                 else:
                     st.error("AI failed to generate a plan.")
 
-    with col2:
+with col2:
         if st.session_state.active_workout:
             plan = st.session_state.active_workout
             split_name = plan.get('recommended_split', 'Unknown Split')
-            intro_sum = plan.get('intro_summary', '')
-            rationale = plan.get('rationale', '')
             
-            st.info(intro_sum)
+            st.info(plan.get('intro_summary', ''))
             st.subheader(f"Protocol: {split_name}")
-            st.caption(f"🧠 **Rationale:** {rationale}")
-            
-            # --- TEXT TO SPEECH FEATURE ---
-            if st.button("🔊 Read Game Plan"):
-                with st.spinner("Generating audio..."):
-                    from gtts import gTTS
-                    import io
-                    
-                    # Combine the text to be read
-                    audio_text = f"{intro_sum} Today's protocol is {split_name}. {rationale}"
-                    
-                    try:
-                        tts = gTTS(text=audio_text, lang='en', slow=False)
-                        audio_fp = io.BytesIO()
-                        tts.write_to_fp(audio_fp)
-                        st.audio(audio_fp, format='audio/mp3', autoplay=True)
-                    except Exception as e:
-                        st.error("Audio generation failed. Check server connection.")
-            
+            st.caption(f"🧠 **Rationale:** {plan.get('rationale', '')}")
             st.divider()
             
             all_completed = True
@@ -71,15 +51,24 @@ with tab_train:
                 
                 if status == 'pending':
                     all_completed = False
-                    if is_new: st.warning(f"💡 **AI Suggestion:** {t['exercise']} (Not in Library)")
-                    else: st.markdown(f"#### {t['exercise']}")
+                    if is_new: 
+                        st.warning(f"💡 **AI Suggestion:** {t['exercise']} (Not in Library)")
+                    else: 
+                        st.markdown(f"#### {t['exercise']}")
                     
                     st.write(f"**Target:** {t.get('target_reps', '8-10')} @ **{t.get('target_weight_kg', 0)} kg**")
                     
                     c1, c2, c3 = st.columns(3)
                     a_weight = c1.number_input(f"Weight", value=float(t.get('target_weight_kg', 0)), key=f"aw_{idx}")
                     a_reps = c2.text_input(f"Reps", key=f"ar_{idx}")
-                    feedback = c3.selectbox("Feedback", ["Achieved: A lot of energy left", "Achieved: Medium energy left", "Achieved: No energy left (Failure)", "Not Achieved: Almost got it", "Not Achieved: Missed by a lot"], key=f"f_{idx}")
+                    feedback = c3.selectbox("Feedback", [
+                        "Achieved: A lot of energy left", 
+                        "Achieved: Medium energy left", 
+                        "Achieved: No energy left (Failure)", 
+                        "Not Achieved: Almost got it", 
+                        "Not Achieved: Missed by a lot"
+                    ], key=f"f_{idx}")
+                    
                     accept_new = st.checkbox("Save to Library", value=True, key=f"acc_{idx}") if is_new else False
                     
                     bc1, bc2 = st.columns([1, 4])
@@ -90,26 +79,26 @@ with tab_train:
                             "is_new": is_new, "accept_new": accept_new, "muscle": t.get('primary_muscle', 'Unknown')
                         })
                         st.session_state.exercise_status[idx] = 'logged'
-                        st.toast("Execution logged. Proceed to the next objective.")
+                        st.toast("Awesome job! Execution logged. Keep that momentum going!")
                         st.rerun()
                         
                     if bc2.button("Skip", key=f"skip_{idx}"):
                         st.session_state.exercise_status[idx] = 'skipped'
-                        st.toast("Exercise skipped. The log reflects your choice.")
+                        st.toast("Exercise skipped. You'll get it next time!")
                         st.rerun()
                     st.divider()
                 
                 elif status == 'logged':
-                    st.success(f"✅ {t['exercise']} - Logged")
+                    st.success(f"✅ {t['exercise']} - Logged brilliantly!")
                 elif status == 'skipped':
                     st.error(f"⏭️ {t['exercise']} - Skipped")
 
             # Finalize Batch
             if all_completed and len(st.session_state.exercise_status) > 0:
-                st.subheader("Session Complete")
+                st.subheader("Session Complete! Amazing effort!")
                 if st.button("Commit Data to Database", type="primary"):
                     date_str = datetime.now().strftime("%Y-%m-%d")
-                    with st.spinner("Processing adaptations..."):
+                    with st.spinner("Processing your wonderful progress..."):
                         final_results = []
                         for r in st.session_state.staged_results:
                             if r['is_new'] and r['accept_new']:
@@ -119,8 +108,7 @@ with tab_train:
                         if final_results:
                             logic.log_and_update(date_str, workout_env, split_name, final_results)
                             
-                    st.success("Data secured. Progression calculated.")
-                    # Reset state
+                    st.success("Data secured and progression calculated! You are one step closer to your goals!")
                     st.session_state.active_workout = None
                     st.session_state.exercise_status = {}
                     st.session_state.staged_results = []
