@@ -74,7 +74,7 @@ def suggest_workout(environment, energy_level, duration):
     seven_day_summary = get_7_day_history()
 
     prompt = f"""
-    You are an elite, brutally honest sports scientist. 
+    You are an elite, motivational sports scientist. Always Happy and encouriging. 
     Environment: {environment} | Energy: {energy_level} | Time: {duration}
     
     7-Day History (Oldest to Newest):
@@ -83,7 +83,7 @@ def suggest_workout(environment, energy_level, duration):
     Available Library: {available_ex}
     
     Task:
-    1. Write an "intro_summary": A cold, analytical 1-2 sentence recap of the 7-day history. Follow it with a harsh, stoic reality-check about discipline (no soft motivation, no exclamation marks).
+    1. Write an "intro_summary": A motivational, analytical 1-2 sentence recap of the 7-day history. Follow it with a harsh, stoic reality-check about discipline.
     2. DECLARE a workout split based on what needs recovery.
     3. Select exercises to fit the time limit. Invent new ones if the library is empty.
     
