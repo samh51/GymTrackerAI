@@ -27,16 +27,22 @@ def get_7_day_history():
     if df.empty:
         return "No history in the last 7 days."
     
+    # Sanitize headers: force everything to lowercase to prevent KeyErrors
+    df.columns = [str(c).lower().strip() for c in df.columns]
+    
+    if 'date' not in df.columns:
+        return "Database error: 'date' column missing."
+    
     # Filter for last 7 days
-    df['Date'] = pd.to_datetime(df['Date'])
+    df['date'] = pd.to_datetime(df['date'], errors='coerce')
     seven_days_ago = datetime.now() - timedelta(days=7)
-    recent_df = df[df['Date'] >= seven_days_ago].copy()
+    recent_df = df[df['date'] >= seven_days_ago].copy()
     
     if recent_df.empty:
         return "No workouts logged in the last 7 days."
         
-    recent_df['DateStr'] = recent_df['Date'].dt.strftime('%Y-%m-%d')
-    summary = recent_df.groupby(['DateStr', 'split'])['exercise'].apply(list).reset_index()
+    recent_df['datestr'] = recent_df['date'].dt.strftime('%Y-%m-%d')
+    summary = recent_df.groupby(['datestr', 'split'])['exercise'].apply(list).reset_index()
     return summary.to_string()
 
 def update_library_targets(updates):
