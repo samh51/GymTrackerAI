@@ -46,11 +46,40 @@ with col2:
             all_completed = True
             
             for idx, t in enumerate(plan.get('exercises', [])):
-                status = st.session_state.exercise_status[idx]
+                status = st.session_state.exercise_status.get(idx, 'pending')
                 is_new = t.get('is_new_suggestion', False)
+                manual_swap_key = f"manual_swap_{idx}"
                 
                 if status == 'pending':
                     all_completed = False
+                    
+                    # --- MANUAL SWAP UI ---
+                    if st.session_state.get(manual_swap_key, False):
+                        st.markdown(f"#### 🔄 Swapping out: {t['exercise']}")
+                        available_options = logic.get_env_exercises(workout_env)
+                        
+                        if available_options:
+                            new_ex_choice = st.selectbox("Select your new exercise:", available_options, key=f"sel_{idx}")
+                            c_btn1, c_btn2 = st.columns(2)
+                            if c_btn1.button("✅ Confirm Swap", key=f"conf_{idx}"):
+                                new_details = logic.get_exercise_details(new_ex_choice)
+                                if new_details:
+                                    st.session_state.active_workout['exercises'][idx] = new_details
+                                    st.session_state[manual_swap_key] = False
+                                    st.toast("Fantastic choice! Exercise updated!")
+                                    st.rerun()
+                            if c_btn2.button("❌ Cancel", key=f"canc_{idx}"):
+                                st.session_state[manual_swap_key] = False
+                                st.rerun()
+                        else:
+                            st.error("No other exercises found in your library for this environment!")
+                            if st.button("Cancel", key=f"canc_empty_{idx}"):
+                                st.session_state[manual_swap_key] = False
+                                st.rerun()
+                        st.divider()
+                        continue # Skip rendering the rest of the normal UI while swapping
+                    
+                    # --- NORMAL EXERCISE UI ---
                     if is_new: 
                         st.warning(f"💡 **AI Suggestion:** {t['exercise']} (Not in Library)")
                     else: 
@@ -71,8 +100,10 @@ with col2:
                     
                     accept_new = st.checkbox("Save to Library", value=True, key=f"acc_{idx}") if is_new else False
                     
-                    bc1, bc2 = st.columns([1, 4])
-                    if bc1.button("Log", key=f"log_{idx}", type="primary"):
+                    # The 4 Dynamic Buttons!
+                    bc1, bc2, bc3, bc4 = st.columns(4)
+                    
+                    if bc1.button("✅ Log", key=f"log_{idx}", type="primary"):
                         st.session_state.staged_results.append({
                             "exercise": t['exercise'], "t_weight": t.get('target_weight_kg', 0), "t_reps": t.get('target_reps', ''),
                             "a_weight": a_weight, "a_reps": a_reps, "feedback": feedback,
@@ -82,11 +113,30 @@ with col2:
                         st.toast("Awesome job! Execution logged. Keep that momentum going!")
                         st.rerun()
                         
-                    if bc2.button("Skip", key=f"skip_{idx}"):
+                    if bc2.button("⏭️ Skip", key=f"skip_{idx}"):
                         st.session_state.exercise_status[idx] = 'skipped'
                         st.toast("Exercise skipped. You'll get it next time!")
                         st.rerun()
+                        
+                    if bc3.button("🔀 Auto-Change", key=f"auto_{idx}"):
+                        alt_ex = logic.get_auto_alternative(t['exercise'], workout_env, t.get('primary_muscle', 'Unknown'))
+                        if alt_ex:
+                            st.session_state.active_workout['exercises'][idx] = alt_ex
+                            st.toast("Swapped! Let's crush this new movement!")
+                            st.rerun()
+                        else:
+                            st.toast("No alternatives found in the library for this muscle/environment!")
+                            
+                    if bc4.button("🔍 Select Other", key=f"man_{idx}"):
+                        st.session_state[manual_swap_key] = True
+                        st.rerun()
+                        
                     st.divider()
+                
+                elif status == 'logged':
+                    st.success(f"✅ {t['exercise']} - Logged brilliantly!")
+                elif status == 'skipped':
+                    st.error(f"⏭️ {t['exercise']} - Skipped")
                 
                 elif status == 'logged':
                     st.success(f"✅ {t['exercise']} - Logged brilliantly!")
