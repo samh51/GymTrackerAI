@@ -17,13 +17,10 @@ client = gspread.authorize(creds)
 # Connect directly to the Sheet via Hardcoded ID
 SHEET_ID = "1HjD_5l2OV1HdQIY-VzD1qK6bqnzHBN36yz40fpStn2Q"
 try:
-    # Bypassing name search, opening by direct ID
     spreadsheet = client.open_by_key(SHEET_ID)
     db_log = spreadsheet.worksheet("WorkoutLog")
     db_library = spreadsheet.worksheet("ExerciseLibrary")
-except gspread.exceptions.SpreadsheetNotFound:
-    st.error("Critical Error: The hardcoded spreadsheet ID was not found. Check if the link is correct and accessible by the service account.")
-    st.stop()
-except gspread.exceptions.WorksheetNotFound:
-    st.error("Critical Error: The spreadsheet was found, but the tabs are wrong. Make sure you have exactly two tabs named 'WorkoutLog' and 'ExerciseLibrary'.")
+    db_cardio = spreadsheet.worksheet("CardioLog") # NEW CARDIO DB
+except Exception as e:
+    st.error(f"Critical Database Error: {e}")
     st.stop()
