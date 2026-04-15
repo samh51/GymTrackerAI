@@ -17,7 +17,61 @@ def delete_exercise(name):
     df = df[df['ExerciseName'] != name]
     db_library.clear()
     db_library.update([df.columns.values.tolist()] + df.values.tolist())
+    
+import random
 
+def get_auto_alternative(current_name, environment, primary_muscle):
+    """Finds a random alternative exercise for the same muscle and environment."""
+    df = get_library()
+    if df.empty: return None
+    
+    df['Environment'] = df['Environment'].fillna("")
+    mask_env = df['Environment'].str.contains(environment, case=False) | df['Environment'].str.contains("Any", case=False)
+    mask_not_current = df['ExerciseName'] != current_name
+    
+    # Try to match the exact muscle group first
+    if primary_muscle and primary_muscle != 'Unknown':
+        mask_muscle = df['TargetMuscle'].str.contains(primary_muscle, case=False)
+        available = df[mask_env & mask_muscle & mask_not_current]
+    else:
+        available = pd.DataFrame()
+        
+    # Fallback: Just grab ANY other exercise for that environment if we can't match the muscle
+    if available.empty:
+        available = df[mask_env & mask_not_current]
+        
+    if available.empty: return None
+    
+    chosen = available.sample(1).iloc[0]
+    return {
+        "exercise": chosen['ExerciseName'],
+        "target_weight_kg": chosen['CurrentWeightKG'],
+        "target_reps": chosen['CurrentReps'],
+        "is_new_suggestion": False,
+        "primary_muscle": chosen['TargetMuscle']
+    }
+
+def get_env_exercises(environment):
+    """Gets a list of all exercise names available in the current environment."""
+    df = get_library()
+    if df.empty: return []
+    df['Environment'] = df['Environment'].fillna("")
+    mask_env = df['Environment'].str.contains(environment, case=False) | df['Environment'].str.contains("Any", case=False)
+    return df[mask_env]['ExerciseName'].tolist()
+
+def get_exercise_details(name):
+    """Fetches the specific target weight and reps for a manually selected exercise."""
+    df = get_library()
+    ex = df[df['ExerciseName'] == name]
+    if ex.empty: return None
+    chosen = ex.iloc[0]
+    return {
+        "exercise": chosen['ExerciseName'],
+        "target_weight_kg": chosen['CurrentWeightKG'],
+        "target_reps": chosen['CurrentReps'],
+        "is_new_suggestion": False,
+        "primary_muscle": chosen['TargetMuscle']
+    }
 def log_cardio(date, c_type, distance, time):
     db_cardio.append_row([date, c_type, distance, time])
 
