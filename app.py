@@ -37,10 +37,30 @@ with tab_train:
         if st.session_state.active_workout:
             plan = st.session_state.active_workout
             split_name = plan.get('recommended_split', 'Unknown Split')
+            intro_sum = plan.get('intro_summary', '')
+            rationale = plan.get('rationale', '')
             
-            st.info(plan.get('intro_summary', ''))
+            st.info(intro_sum)
             st.subheader(f"Protocol: {split_name}")
-            st.caption(f"🧠 **Rationale:** {plan.get('rationale', '')}")
+            st.caption(f"🧠 **Rationale:** {rationale}")
+            
+            # --- TEXT TO SPEECH FEATURE ---
+            if st.button("🔊 Read Game Plan"):
+                with st.spinner("Generating audio..."):
+                    from gtts import gTTS
+                    import io
+                    
+                    # Combine the text to be read
+                    audio_text = f"{intro_sum} Today's protocol is {split_name}. {rationale}"
+                    
+                    try:
+                        tts = gTTS(text=audio_text, lang='en', slow=False)
+                        audio_fp = io.BytesIO()
+                        tts.write_to_fp(audio_fp)
+                        st.audio(audio_fp, format='audio/mp3', autoplay=True)
+                    except Exception as e:
+                        st.error("Audio generation failed. Check server connection.")
+            
             st.divider()
             
             all_completed = True
